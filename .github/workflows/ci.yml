@@ -1,6 +1,6 @@
 name: CI Pipeline
 
-on: [push, pull_request]
+on: [push, pullrequest]
 
 jobs:
   backend-python:
@@ -19,16 +19,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install dependencies and run tests
         run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install -r requirements.txt
+        python -m venv venv
+        source venv/bin/activate
+        pip install -r requirements.txt
+        pytest
 
-      - name: ✅ Run tests
-        run: |
-          source venv/bin/activate
-          pytest
 
   frontend-react:
     name: Build Frontend (React)
