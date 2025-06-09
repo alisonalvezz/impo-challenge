@@ -44,7 +44,5 @@ body {
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;    git add .
-    git commit -m "Implementar sidebar responsive con animaciones suaves"
-    git push origin main
+    monospace;
 }
