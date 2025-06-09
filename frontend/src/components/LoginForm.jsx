@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import impoLogo from '../assets/impo.png';
 import { EyeIcon, EyeSlashIcon } from './icons/EyeIcons';
 
-const LoginForm = () => {
+const LoginForm = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -10,6 +10,10 @@ const LoginForm = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log('Login attempt with:', { email, password });
+    //agrego asi puedo acceder al inicio 
+    if (onLogin) {
+      onLogin();
+    }
   };
 
   return (
