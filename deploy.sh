@@ -12,29 +12,34 @@ BACKEND_IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/backend"
 FRONTEND_SERVICE="frontend"
 BACKEND_SERVICE="backend"
 
-echo "🔐 Autenticando con la cuenta de servicio..."
+echo "autenticando con la cuenta de servicio"
 gcloud auth activate-service-account --key-file="$CREDENTIALS_FILE"
 gcloud config set project "$PROJECT_ID"
 
-echo "🔧 Configurando Docker para Artifact Registry..."
+echo "configurando Docker para Artifact Registry"
 gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
 
-echo "🚀 Desplegando frontend..."
+echo "construyendo docker con arquitectura compatible :p"
+docker build --platform linux/amd64 -t "$FRONTEND_IMAGE" ./frontend
+docker build --platform linux/amd64 -t "$BACKEND_IMAGE" ./backend
+
+echo "pusheando imágenes a Artifact Registry"
+docker push "$FRONTEND_IMAGE"
+docker push "$BACKEND_IMAGE"
+
+echo "dsplegando frontend"
 gcloud run deploy "$FRONTEND_SERVICE" \
   --image "$FRONTEND_IMAGE" \
   --platform managed \
   --region "$REGION" \
   --allow-unauthenticated
 
-echo "🚀 Desplegando backend..."
+echo "desplegando backend"
 gcloud run deploy "$BACKEND_SERVICE" \
   --image "$BACKEND_IMAGE" \
   --platform managed \
   --region "$REGION" \
   --allow-unauthenticated \
-  --set-secrets FIREBASE_CREDENTIALS_JSON_=FIREBASE_CREDENTIALS_JSON_:latest
-
-
-
+  --service-account "firebase-adminsdk-fbsvc@impo-equipo1.iam.gserviceaccount.com"
 
 echo "✅ ¡Deploy completo!"
