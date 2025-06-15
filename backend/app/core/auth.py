@@ -1,4 +1,4 @@
-from fastapi import Request, HTTPException, Depends
+from fastapi import Request, HTTPException
 from firebase_admin import auth
 
 async def verify_token(request: Request):
@@ -9,6 +9,10 @@ async def verify_token(request: Request):
     token = auth_header.split(" ")[1]
     try:
         decoded_token = auth.verify_id_token(token)
-        return decoded_token  # contiene uid, email, etc.
+        return decoded_token  # contiene uid, email, claims, etc.
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+def check_admin(user_token):
+    if user_token.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only access")
