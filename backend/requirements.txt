@@ -6,3 +6,5 @@ python-dotenv
 firebase-admin
 google-cloud-firestore
 pydantic[email]
+dotenv
+python-multipart

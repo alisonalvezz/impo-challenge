@@ -1,8 +1,12 @@
 import requests
+import os
+from dotenv import load_dotenv
 
-API_KEY = "tu-api-key"
-EMAIL = "tu_email@ejemplo.com"
-PASSWORD = "tu_contraseña"
+load_dotenv()
+
+API_KEY = os.getenv("API_KEY")
+EMAIL = os.getenv("EMAIL")
+PASSWORD = os.getenv("PASSWORD")
 
 def get_firebase_id_token(email, password, api_key):
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
