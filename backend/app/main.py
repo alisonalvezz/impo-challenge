@@ -1,10 +1,13 @@
-import os
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from api.routes_file import router as files_router
+from api.routes_user import router as users_router
+from api.routes_admin import router as admin_router
 
 app = FastAPI()
 app.include_router(files_router)
+app.include_router(users_router)
+app.include_router(admin_router)
 
 def custom_openapi():
     if app.openapi_schema:
@@ -35,6 +38,7 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 if __name__ == "__main__":
+    import os
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)

@@ -1,6 +1,6 @@
 import requests
 
-API_KEY = "AIzaSyAkR-ghiPN0oQqnC7wk4pD7GmJwM-LyogI"
+API_KEY = "tu-api-key"
 EMAIL = "tu_email@ejemplo.com"
 PASSWORD = "tu_contraseña"
 
