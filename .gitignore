@@ -63,3 +63,5 @@ pnpm-debug.log*
 
 tmp/
 *.bak
+firebase-credentials.json
+credenciales

@@ -2,9 +2,12 @@ import os
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from api.routes_file import router as files_router
+from api.routes_user import router as users_router
 
 app = FastAPI()
 app.include_router(files_router)
+app.include_router(users_router)
+
 
 def custom_openapi():
     if app.openapi_schema:
