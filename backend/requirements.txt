@@ -5,3 +5,4 @@ google-cloud-storage
 python-dotenv
 firebase-admin
 google-cloud-firestore
+pydantic[email]
