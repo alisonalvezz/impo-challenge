@@ -5,10 +5,6 @@ from core.auth import verify_token
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-@router.get("/")
-def list_users(user=Depends(verify_token)):
-    return user_service.list_users()
-
 @router.get("/me")
 def get_current_user(user=Depends(verify_token)):
     user_data = user_service.get_user(user["uid"])

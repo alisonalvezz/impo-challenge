@@ -3,6 +3,7 @@ from pydantic import BaseModel, EmailStr
 from firebase_admin import auth
 from core.auth import verify_token, check_admin
 from core.firebase import db
+from services import user_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -11,6 +12,11 @@ class NewUserRequest(BaseModel):
     password: str
     display_name: str | None = None
     role: str = "user"
+
+@router.get("/")
+def list_users(user=Depends(verify_token)):
+    check_admin(user)
+    return user_service.list_users()
 
 @router.post("/create-user")
 def create_user(new_user: NewUserRequest, user=Depends(verify_token)):
