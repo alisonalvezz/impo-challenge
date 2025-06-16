@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import impoLogo from '../../assets/impo.png';
 
 //iconos de los items de nav (la casita y carpeta)
@@ -114,10 +114,32 @@ const CloseIcon = ({ className }) => (
   </svg>
 );
 
+const PersonIcon = ({ className, color = "#939292" }) => (
+  <svg className={className} width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="14" cy="10" r="5" fill={color} />
+    <rect x="6" y="18" width="16" height="6" rx="3" fill={color} />
+  </svg>
+);
+
 // Sidebar 
-const Sidebar = ({ activeItem = 'inicio', onItemChange }) => {
+const Sidebar = ({ activeItem = 'inicio', onItemChange, user }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);const menuItems = [
+  const [isClosing, setIsClosing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      if (user) {
+        const token = await user.getIdTokenResult();
+        setIsAdmin(token.claims.role === 'admin');
+      } else {
+        setIsAdmin(false);
+      }
+    }
+    checkAdmin();
+  }, [user]);
+
+  const menuItems = [
     {
       id: 'inicio',
       label: 'Inicio',
@@ -127,8 +149,16 @@ const Sidebar = ({ activeItem = 'inicio', onItemChange }) => {
       id: 'documentos',
       label: 'Documentos',
       icon: FolderIcon
-    }
+    },
   ];
+  if (isAdmin) {
+    menuItems.push({
+      id: 'admin',
+      label: 'Admin',
+      icon: PersonIcon
+    });
+  }
+
   const handleItemClick = (itemId) => {
     if (onItemChange) {
       onItemChange(itemId);
