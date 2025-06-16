@@ -1,15 +1,38 @@
 import React, { useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../config/firebase';
 import impoLogo from '../assets/impo.png';
 import { EyeIcon, EyeSlashIcon } from './icons/EyeIcons';
 
-const LoginForm = () => {
+const LoginForm = ( onLogin ) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login attempt with:', { email, password });
+    setError('');
+    setLoading(true);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      console.log('Usuario autenticado:', user);
+    } catch (error) {
+      console.error('Error de autenticación:', error);
+      setError(
+        error.code === 'auth/invalid-credential'
+          ? 'Credenciales inválidas'
+          : 'Error al iniciar sesión. Por favor, intenta nuevamente.'
+      );
+    } finally {
+      setLoading(false);
+    }
+    if (onLogin) {
+      onLogin();
+    }
   };
 
   return (
@@ -27,6 +50,12 @@ const LoginForm = () => {
           Inicia sesión
         </h1>
         
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -70,9 +99,13 @@ const LoginForm = () => {
 
           <button
             type="submit"
-            className="w-full bg-impo-blue text-white py-3 px-4 rounded-xl font-semibold hover:bg-impo-blue-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-impo-blue transform transition-all duration-150 ease-in-out hover:shadow-md active:scale-[0.98]"
+            disabled={loading}
+            className={`w-full bg-impo-blue text-white py-3 px-4 rounded-xl font-semibold 
+              ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-impo-blue-hover'} 
+              focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-impo-blue 
+              transform transition-all duration-150 ease-in-out hover:shadow-md active:scale-[0.98]`}
           >
-            Ingresar
+            {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
 
           <div className="flex justify-end">
