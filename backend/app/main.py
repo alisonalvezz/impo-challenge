@@ -3,11 +3,24 @@ from fastapi.openapi.utils import get_openapi
 from api.routes_file import router as files_router
 from api.routes_user import router as users_router
 from api.routes_admin import router as admin_router
+from fastapi.middleware.cors import CORSMiddleware
+
+origins = [
+    "https://frontend-217609179837.us-central1.run.app",
+]
 
 app = FastAPI()
 app.include_router(files_router)
 app.include_router(users_router)
 app.include_router(admin_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def custom_openapi():
     if app.openapi_schema:
