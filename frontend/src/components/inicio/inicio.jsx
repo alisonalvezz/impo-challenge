@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from '../sidebar/sidebar.jsx';
 import DocumentsIndex from '../documentos/DocumentsIndex.jsx';
+import AdminAddUser from '../admin/AdminAddUser.jsx';
 
 const Inicio = ({ user }) => {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -15,6 +16,7 @@ const Inicio = ({ user }) => {
       <Sidebar 
         activeItem={activeTab} 
         onItemChange={handleTabChange} 
+        user={user}
       />
       {/* Contenido principal */}
       <div className="flex-1 p-4 pt-20 lg:p-8 lg:pt-8">
@@ -22,6 +24,8 @@ const Inicio = ({ user }) => {
           <h1 className="text-3xl font-bold text-gray-800 mb-6">
             ¡Bienvenido/a!
           </h1>
+        ) : activeTab === 'admin' ? (
+          <AdminAddUser user={user} />
         ) : (
           <DocumentsIndex user={user} />
         )}
