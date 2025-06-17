@@ -3,13 +3,15 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import impoLogo from '../assets/impo.png';
 import { EyeIcon, EyeSlashIcon } from './icons/EyeIcons';
+import ResetPasswordForm from './ResetPasswordForm';
 
-const LoginForm = ( onLogin ) => {
+const LoginForm = ({ onLogin = null }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,6 +36,10 @@ const LoginForm = ( onLogin ) => {
       onLogin();
     }
   };
+
+  if (showResetPassword) {
+    return <ResetPasswordForm onBack={() => setShowResetPassword(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-impo-bg flex flex-col items-center justify-center p-4 font-inter">
@@ -111,7 +117,7 @@ const LoginForm = ( onLogin ) => {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => {}}
+              onClick={() => setShowResetPassword(true)}
               className="text-sm font-medium text-impo-blue hover:text-impo-blue-hover transition-colors mt-4"
             >
               ¿Olvidaste la contraseña?
