@@ -27,12 +27,6 @@ function App() {
       ) : (
         <LoginForm />
       )}
-      <button
-        className="mt-8 text-sm text-red-500 hover:underline"
-        onClick={() => auth.signOut()}
-      >
-        Cerrar sesión
-      </button>
     </div>
   );
 }

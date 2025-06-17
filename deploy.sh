@@ -24,13 +24,12 @@ gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
 echo "construyendo docker con arquitectura compatible :p"
 docker build --platform linux/amd64 -t "$FRONTEND_IMAGE" ./frontend
 docker build --platform linux/amd64 -t "$BACKEND_IMAGE" ./backend
+docker build --platform linux/amd64 -t "$CLOUD_FUNCTION_IMAGE" ./cloud-function
 
 echo "pusheando imágenes a Artifact Registry"
 docker push "$FRONTEND_IMAGE"
 docker push "$BACKEND_IMAGE"
-
-echo "construyendo docker de cloud function"
-gcloud builds submit --tag "$CLOUD_FUNCTION_IMAGE" ./cloud-function
+docker push "$CLOUD_FUNCTION_IMAGE"
 
 echo "dsplegando frontend"
 gcloud run deploy "$FRONTEND_SERVICE" \
