@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { db } from '../../config/firebase';
+import { doc as firestoreDoc, onSnapshot } from 'firebase/firestore';
 
 const LoadingSpinner = () => (
   <div className="flex flex-col items-center justify-center h-full">
@@ -9,11 +11,47 @@ const LoadingSpinner = () => (
 
 export default function CopeteGenerador({ doc, onBack }) {
   const [generatedText, setGeneratedText] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [extractedText, setExtractedText] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [estado, setEstado] = useState("pendiente");
+  const [activeTab, setActiveTab] = useState("pdf");
 
   const isImage = doc.url && (doc.url.endsWith('.png') || doc.url.endsWith('.jpg') || doc.url.endsWith('.jpeg') || doc.url.endsWith('.gif'));
   const isPDF = doc.url && doc.url.endsWith('.pdf');
+
+  const handleDocumentUpdate = useCallback((docSnapshot) => {
+    if (docSnapshot.exists()) {
+      const data = docSnapshot.data();
+      setEstado(data.estado || "pendiente");
+      if (data.texto_extraido) {
+        setExtractedText(data.texto_extraido);
+      }
+      if (data.estado === "generado" && data.copete) {
+        setGeneratedText(data.copete);
+        setIsLoading(false);
+      } else if (data.estado === "pendiente") {
+        setIsLoading(true);
+      } else if (data.estado === "error") {
+        setError(data.errorMensaje || "Error desconocido al procesar el documento");
+        setIsLoading(false);
+      }
+    } else {
+      setError("Documento no encontrado en Firestore");
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const documentRef = firestoreDoc(db, "files", doc.id);
+    const unsubscribe = onSnapshot(documentRef, handleDocumentUpdate, (err) => {
+      console.error("Error al escuchar cambios del documento:", err);
+      setError("Error al cargar el copete");
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [doc.id, handleDocumentUpdate]);
 
   return (
     <div className="flex h-screen bg-gray-50 font-inter relative">
@@ -32,9 +70,39 @@ export default function CopeteGenerador({ doc, onBack }) {
             <div className="p-4 border-b border-gray-200">
               <h2 className="text-lg font-bold text-gray-800">Documento de origen</h2>
               <p className="text-sm text-gray-500 truncate">{doc.name}</p>
+              
+              {/* tabs para alternar entre PDF y texto extraído */}
+              {isPDF && extractedText && (
+                <div className="flex mt-3 border-b border-gray-200">
+                  <button
+                    onClick={() => setActiveTab("pdf")}
+                    className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      activeTab === "pdf" 
+                        ? "text-impo-blue border-b-2 border-impo-blue bg-blue-50" 
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    PDF Original
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("texto")}
+                    className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      activeTab === "texto" 
+                        ? "text-impo-blue border-b-2 border-impo-blue bg-blue-50" 
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    Texto Extraído
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex-1 flex min-h-0 min-w-0">
-              {isImage ? (
+              {activeTab === "texto" && extractedText ? (
+                <div className="w-full h-full p-4 text-gray-700 bg-gray-50 overflow-auto text-sm leading-relaxed">
+                  <div className="whitespace-pre-wrap">{extractedText}</div>
+                </div>
+              ) : isImage ? (
                 <img src={doc.url} alt={doc.name} className="w-full h-full object-contain" />
               ) : isPDF ? (
                 <iframe
@@ -52,15 +120,23 @@ export default function CopeteGenerador({ doc, onBack }) {
           {/* a la derecha el copete generado por IA */}
           <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-200">
             <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-gray-800">Generado por IA</h2>
-              <p className="text-sm text-gray-500">El copete resultante aparecerá aquí.</p>
+              <h2 className="text-lg font-bold text-gray-800">Copete generado por IA</h2>
+              <p className="text-sm text-gray-500">
+                {estado === "pendiente" ? "Procesando documento..." : 
+                 estado === "generado" ? "Copete listo" : 
+                 "Estado: " + estado}
+              </p>
             </div>
             <div className="flex-grow p-4 relative">
               {isLoading ? (
                 <LoadingSpinner />
+              ) : error ? (
+                <div className="w-full h-full p-4 text-red-500 bg-red-50 rounded-md">
+                  {error}
+                </div>
               ) : (
-                <div className="w-full h-full p-2 text-gray-700 bg-gray-50 rounded-md whitespace-pre-wrap">
-                  {error ? <p className="text-red-500">{error}</p> : generatedText}
+                <div className="w-full h-full p-4 text-gray-700 bg-gray-50 rounded-md whitespace-pre-wrap overflow-auto">
+                  {generatedText || "No se pudo generar el copete"}
                 </div>
               )}
             </div>
