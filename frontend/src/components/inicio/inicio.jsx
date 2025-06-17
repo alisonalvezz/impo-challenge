@@ -22,7 +22,7 @@ const Inicio = ({ user }) => {
       <div className="flex-1 p-4 pt-20 lg:p-8 lg:pt-8">
         {activeTab === 'inicio' ? (
           <h1 className="text-3xl font-bold text-gray-800 mb-6">
-            ¡Bienvenido/a!
+            ¡Bienvenido/a{user && (user.displayName || user.email) ? `, ${user.displayName || (user.email ? user.email.split('@')[0] : '')}` : ''}!
           </h1>
         ) : activeTab === 'admin' ? (
           <AdminAddUser user={user} />

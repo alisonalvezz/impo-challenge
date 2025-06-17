@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import impoLogo from '../../assets/impo.png';
+import { auth } from '../../config/firebase';
 
 //iconos de los items de nav (la casita y carpeta)
 const HomeIcon = ({ className, color = "#939292" }) => (
@@ -121,6 +122,14 @@ const PersonIcon = ({ className, color = "#939292" }) => (
   </svg>
 );
 
+const LogoutIcon = ({ className, color = "#939292" }) => (
+  <svg className={className} width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 6H8C6.9 6 6 6.9 6 8V20C6 21.1 6.9 22 8 22H10" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M16 16L22 14L16 12" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M22 14H10" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 // Sidebar 
 const Sidebar = ({ activeItem = 'inicio', onItemChange, user }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -138,6 +147,10 @@ const Sidebar = ({ activeItem = 'inicio', onItemChange, user }) => {
     }
     checkAdmin();
   }, [user]);
+
+  const handleLogout = () => {
+    auth.signOut();
+  };
 
   const menuItems = [
     {
@@ -199,7 +212,6 @@ const Sidebar = ({ activeItem = 'inicio', onItemChange, user }) => {
           {menuItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = activeItem === item.id;
-            const textColor = isActive ? '#007FC0' : '#939292';
             
             return (
               <li key={item.id}>
@@ -231,6 +243,31 @@ const Sidebar = ({ activeItem = 'inicio', onItemChange, user }) => {
           })}
         </ul>
       </nav>
+
+      {/* Info de usuario */}
+      {user && (
+        <div className="px-4 pb-2 flex items-center space-x-3">
+          <PersonIcon className="w-7 h-7" color="#007FC0" />
+          <span className="text-sm font-semibold text-gray-700 truncate max-w-[120px]">
+            {user.displayName || (user.email ? user.email.split('@')[0] : '')}
+          </span>
+        </div>
+      )}
+      {/* Botón de cerrar sesión */}
+      <div className="px-4 pb-6">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors duration-200 hover:bg-red-50 group"
+        >
+          <LogoutIcon 
+            className="flex-shrink-0 transition-colors duration-200" 
+            color="#EF4444"
+          />
+          <span className="text-sm font-medium text-red-500 group-hover:text-red-600 transition-colors duration-200">
+            Cerrar sesión
+          </span>
+        </button>
+      </div>
     </>
   );
   return (
