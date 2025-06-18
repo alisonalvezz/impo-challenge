@@ -58,4 +58,12 @@ gcloud functions deploy process_document \
   --entry-point process_document \
   --memory=512MB
 
+gcloud functions deploy process_document_v2 \
+  --gen2 --runtime=python311 --region=$REGION \
+  --source=cloud-function \
+  --entry-point=process_document \
+  --trigger-event-filters="type=google.cloud.storage.object.v1.finalized" \
+  --trigger-event-filters="$BUCKET_NAME" \
+  --allow-unauthenticated
+
 echo "✅ ¡Deploy completo!"
