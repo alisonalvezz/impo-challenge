@@ -7,6 +7,7 @@ import img2 from '../../assets/2.png';
 import img3 from '../../assets/3.png';
 import img4 from '../../assets/4.png';
 import img5 from '../../assets/5.png';
+import img6 from '../../assets/6.png';
 
 const Inicio = ({ user }) => {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -80,6 +81,16 @@ const Inicio = ({ user }) => {
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Obtener el Resultado</h3>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   Una vez procesado, el documento original y su copete estarán disponibles en su lista.
+                </p>
+              </div>
+
+              {/* 6 */}
+              <div className="relative flex flex-col bg-white p-6 rounded-xl shadow-md border border-gray-100 h-full transition-transform duration-300 hover:shadow-lg hover:-translate-y-1 export-options">
+                <div className="absolute top-0 left-0 bg-impo-blue text-white w-8 h-8 flex items-center justify-center rounded-tl-xl rounded-br-lg font-bold">6</div>
+                <img src={img6} alt="Paso 6: Exportar" className="w-full rounded-lg shadow-sm border my-4"/>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Exportar el Copete</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Para finalizar, puede utilizar estos botones para exportar el copete en el formato que prefiera, ya se PDF, DOC o copiar el texto generado.
                 </p>
               </div>
             </div>
