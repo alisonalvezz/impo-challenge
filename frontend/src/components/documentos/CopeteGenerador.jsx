@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { jsPDF } from "jspdf"; 
+import { saveAs } from "file-saver";
+import { Document, Packer, Paragraph, TextRun } from "docx";
 import { db } from '../../config/firebase';
 import { doc as firestoreDoc, onSnapshot } from 'firebase/firestore';
 
@@ -7,7 +10,7 @@ const LoadingSpinner = () => (
     <div className="w-12 h-12 rounded-full animate-spin border-4 border-solid border-blue-500 border-t-transparent"></div>
     <p className="mt-4 text-gray-500">Generando copete...</p>
   </div>
-);
+); 
 
 export default function CopeteGenerador({ doc, onBack }) {
   const [generatedText, setGeneratedText] = useState("");
@@ -19,7 +22,6 @@ export default function CopeteGenerador({ doc, onBack }) {
 
   const isImage = doc.url && (doc.url.endsWith('.png') || doc.url.endsWith('.jpg') || doc.url.endsWith('.jpeg') || doc.url.endsWith('.gif'));
   const isPDF = doc.url && doc.url.endsWith('.pdf');
-
   const handleDocumentUpdate = useCallback((docSnapshot) => {
     if (docSnapshot.exists()) {
       const data = docSnapshot.data();
@@ -41,6 +43,43 @@ export default function CopeteGenerador({ doc, onBack }) {
       setIsLoading(false);
     }
   }, []);
+
+  const generatePDF = () => {
+    const pdf = new jsPDF();
+    const text = generatedText;
+    const save = doc.name.replace(".pdf", "_copete") + '.pdf';
+
+    const pageWidth = pdf.internal.pageSize.width; // Get page width
+    const margin = 10; // Define margin
+    const textWidth = pageWidth - margin * 2; // Calculate usable width
+
+    // Use splitTextToSize to wrap the text
+    const formattedText = pdf.splitTextToSize(text, textWidth);
+
+    // Add the formatted text to the PDF
+    pdf.text(formattedText, margin, 20);
+    pdf.save(save); // Save the PDF with the name 'example.pdf'
+  };
+
+const exportToDocx = () => {
+  const docx = new Document({
+    sections: [
+      {
+        properties: {},
+        children: [
+          new Paragraph({
+            children: [new TextRun(generatedText)],
+          }),
+        ],
+      },
+    ],
+  });
+
+  // Generate the .docx file
+  Packer.toBlob(docx).then((blob) => {
+    saveAs(blob, 'docx');
+  });
+};
 
   useEffect(() => {
     const documentRef = firestoreDoc(db, "files", doc.id);
@@ -118,6 +157,7 @@ export default function CopeteGenerador({ doc, onBack }) {
             </div>
           </div>
           {/* a la derecha el copete generado por IA */}
+          
           <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-200">
             <div className="p-4 border-b border-gray-200">
               <h2 className="text-lg font-bold text-gray-800">Copete generado por IA</h2>
@@ -126,6 +166,25 @@ export default function CopeteGenerador({ doc, onBack }) {
                  estado === "generado" ? "Copete listo" : 
                  "Estado: " + estado}
               </p>
+              <div className='flex relative justify-end pr-4 space-x-2'>
+                <button onClick={generatePDF} class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded pr-4">
+                  <svg class="w-[28px] h-[28px] text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M5 17v-5h1.5a1.5 1.5 0 1 1 0 3H5m12 2v-5h2m-2 3h2M5 10V7.914a1 1 0 0 1 .293-.707l3.914-3.914A1 1 0 0 1 9.914 3H18a1 1 0 0 1 1 1v6M5 19v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1M10 3v4a1 1 0 0 1-1 1H5m6 4v5h1.375A1.627 1.627 0 0 0 14 15.375v-1.75A1.627 1.627 0 0 0 12.375 12H11Z"/>
+                  </svg>
+                </button>
+
+                <button onClick={exportToDocx} class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded pl-4" name='2'>
+                  <svg class="w-[28px] h-[28px] text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M5 10V7.914a1 1 0 0 1 .293-.707l3.914-3.914A1 1 0 0 1 9.914 3H18a1 1 0 0 1 1 1v6M5 19v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1M10 3v4a1 1 0 0 1-1 1H5m14 9.006h-.335a1.647 1.647 0 0 1-1.647-1.647v-1.706a1.647 1.647 0 0 1 1.647-1.647L19 12M5 12v5h1.375A1.626 1.626 0 0 0 8 15.375v-1.75A1.626 1.626 0 0 0 6.375 12H5Zm9 1.5v2a1.5 1.5 0 0 1-1.5 1.5v0a1.5 1.5 0 0 1-1.5-1.5v-2a1.5 1.5 0 0 1 1.5-1.5v0a1.5 1.5 0 0 1 1.5 1.5Z"/>
+                  </svg>
+                </button>
+                <button onClick ={()=> navigator.clipboard.writeText(generatedText)} class="bg-green-500 hover:bg-green-700 text-black font-bold py-2 px-4 rounded">
+                  <svg class="w-[28px] h-[28px] text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" stroke-linejoin="round" stroke-width="1" d="M9 8v3a1 1 0 0 1-1 1H5m11 4h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1m4 3v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7.13a1 1 0 0 1 .24-.65L7.7 8.35A1 1 0 0 1 8.46 8H13a1 1 0 0 1 1 1Z"/>
+                  </svg>
+
+                </button>
+              </div>
             </div>
             <div className="flex-grow p-4 relative">
               {isLoading ? (
@@ -145,4 +204,6 @@ export default function CopeteGenerador({ doc, onBack }) {
       </main>
     </div>
   );
+
+  
 } 
