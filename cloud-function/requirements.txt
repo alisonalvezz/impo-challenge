@@ -1,5 +1,0 @@
-firebase-admin
-google-cloud-storage
-google-cloud-firestore
-google-cloud-aiplatform>=1.40.0
-PyMuPDF
