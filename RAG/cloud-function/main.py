@@ -13,7 +13,10 @@ from dotenv import load_dotenv
 import uuid
 from datetime import datetime
 import pytz
+import sys
+import subprocess
 
+sys.path.append(os.path.join(os.path.dirname(__file__), 'RAG'))
 
 load_dotenv('.env')
 
@@ -45,73 +48,32 @@ def extract_text_from_pdf(bucket_name, file_name):
         print(f"Error extracting text from PDF: {e}")
         return None
 
-def process_with_agent_engine(document_text, user_id="pdf-processor"):
-    """Process document text using Vertex AI Agent Engine via REST API."""
+def process_with_adk_directly(document_text, user_id="pdf-processor"):
+    """Process document text using ADK directamente (patrón moderno con sesión y mensaje)."""
     try:
-        PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
-        REGION = os.getenv("GOOGLE_CLOUD_LOCATION")
-        AGENT_ENGINE_ID = os.getenv("AGENT_ENGINE_ID")
+        import asyncio
+        from google.adk.runners import InMemoryRunner
+        from google.genai.types import Part, UserContent
+        from rag.agent import root_agent
         
-        if not all([PROJECT_ID, REGION, AGENT_ENGINE_ID]):
-            raise Exception("Missing required environment variables")
-
-        access_token = get_access_token()
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-
-        query_url = f"https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{REGION}/reasoningEngines/{AGENT_ENGINE_ID.split('/')[-1]}:streamQuery"
-        query_payload = {
-            "class_method": "stream_query",
-            "input": {
-                "input": f"Extrae el copete del siguiente documento:\n\n{document_text}"
-            }
-        }
-        
-        print("Sending direct query to agent engine...")
-        query_response = requests.post(query_url, json=query_payload, headers=headers, stream=True)
-        
-        if query_response.status_code == 404:
-            print(":streamQuery endpoint not found, trying alternative approach...")
-            return "El agente no está configurado para responder a consultas directas. Se requiere configuración adicional."
-        elif query_response.status_code == 400:
-            print("Bad request, trying different payload format...")
-            query_payload_alt = {
-                "input": f"Extrae el copete del siguiente documento:\n\n{document_text}"
-            }
-            query_response = requests.post(query_url, json=query_payload_alt, headers=headers, stream=True)
-            query_response.raise_for_status()
-        else:
-            query_response.raise_for_status()
-
-        response_text = ""
-        try:
-            for line in query_response.iter_lines():
-                if line:
-                    line_str = line.decode('utf-8')
-                    if line_str.startswith('data: '):
-                        data = line_str[6:]
-                        if data and data != '[DONE]':
-                            try:
-                                event_data = json.loads(data)
-                                if 'output' in event_data:
-                                    response_text += event_data['output']
-                                elif 'content' in event_data:
-                                    response_text += str(event_data['content'])
-                            except json.JSONDecodeError:
-                                response_text += data
-        except Exception as e:
-            print(f"Error parsing streaming response: {e}")
-            try:
-                response_text = query_response.text
-            except:
-                response_text = "Error al procesar la respuesta del agente"
-        
-        return response_text.strip() if response_text else "No se pudo extraer el copete del documento."
-        
+        print("Inicializando ADK agent directamente...")
+        prompt = f"Genera un copete para el siguiente documento legal:\n\n{document_text}"
+        runner = InMemoryRunner(app_name="copete-generator", agent=root_agent)
+        session = asyncio.run(runner.session_service.create_session(app_name=runner.app_name, user_id=user_id))
+        content = UserContent(parts=[Part(text=prompt)])
+        result = None
+        for event in runner.run(user_id=session.user_id, session_id=session.id, new_message=content):
+            if hasattr(event, 'content') and hasattr(event.content, 'parts'):
+                for part in event.content.parts:
+                    if hasattr(part, 'text') and part.text:
+                        result = part.text
+                        break
+            if result:
+                break
+        print(f"ADK agent result: {result}")
+        return result if result else "No se pudo extraer el copete del documento."
     except Exception as e:
-        print(f"Error processing with agent engine: {e}")
+        print(f"Error processing with ADK directly: {e}")
         return f"Error al procesar el documento: {str(e)}"
 
 @functions_framework.cloud_event
@@ -140,11 +102,13 @@ def process_pdf_agent(cloud_event):
         
         print(f"Extracted {len(document_text)} characters from PDF")
         
-        copete = process_with_agent_engine(document_text)
+        doc_ref = firestore_client.collection('files').document(doc_id)
+        doc_ref.set({"texto_extraido": document_text}, merge=True)
+        
+        copete = process_with_adk_directly(document_text)
         
         print(f"Extracted copete: {copete}")
         
-        doc_ref = firestore_client.collection('files').document(doc_id)
         doc_ref.set({
             'estado': 'generado',
             'copete': copete,
