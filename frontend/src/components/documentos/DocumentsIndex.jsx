@@ -3,6 +3,8 @@ import { FileText, Plus, Search, Trash2, Calendar, ArrowUpDown } from 'lucide-re
 import { auth } from '../../config/firebase';
 import axios from 'axios';
 import CopeteGenerador from './CopeteGenerador';
+import { useSnackbar } from '../SnackbarContext';
+import ConfirmDialog from '../ConfirmDialog';
 
 const DocumentsIndex = ({ user }) => {
   const [docs, setDocs] = useState([]);
@@ -15,6 +17,8 @@ const DocumentsIndex = ({ user }) => {
   const [uploading, setUploading] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [deletingDoc, setDeletingDoc] = useState(null);
+  const showSnackbar = useSnackbar();
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, docId: null });
 
   const getToken = async () => {
     const user = auth.currentUser;
@@ -54,6 +58,10 @@ const DocumentsIndex = ({ user }) => {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (docs.some(doc => doc.name === file.name)) {
+      showSnackbar('Ya existe un archivo con ese nombre.', 'warning');
+      return;
+    }
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
@@ -65,40 +73,33 @@ const DocumentsIndex = ({ user }) => {
           Authorization: `Bearer ${token}`,
         },
       });
-      
       const newDocId = response.data.id;
-      console.log('Documento subido con ID:', newDocId);
-      
+      showSnackbar('Archivo subido correctamente.', 'success');
       setTimeout(async () => {
         const updatedDocs = await fetchDocs();
-        console.log('Documentos actualizados:', updatedDocs);
-        
         const newDoc = updatedDocs.find(doc => doc.id === newDocId);
-        console.log('Documento encontrado:', newDoc);
-        
         if (newDoc) {
-          console.log('Abriendo documento:', newDoc.name);
           setSelectedDoc(newDoc);
         } else {
-          console.log('No se encontró el documento, actualizando lista...');
           fetchDocs();
         }
       }, 2000);
-      
     } catch (err) {
       console.error('Error al subir archivo:', err);
-      alert('Error al subir el archivo');
+      showSnackbar('Error al subir el archivo', 'error');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDeleteDoc = async (docId, e) => {
+  const handleDeleteDoc = (docId, e) => {
     e.stopPropagation();
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este documento?')) {
-      return;
-    }
-    
+    setConfirmDialog({ open: true, docId });
+  };
+
+  const confirmDelete = async () => {
+    const docId = confirmDialog.docId;
+    setConfirmDialog({ open: false, docId: null });
     setDeletingDoc(docId);
     try {
       const token = await getToken();
@@ -106,9 +107,10 @@ const DocumentsIndex = ({ user }) => {
         headers: { Authorization: `Bearer ${token}` },
       });
       await fetchDocs();
+      showSnackbar('Documento eliminado correctamente.', 'success');
     } catch (err) {
       console.error('Error al eliminar documento:', err);
-      alert('Error al eliminar el documento');
+      showSnackbar('Error al eliminar el documento', 'error');
     } finally {
       setDeletingDoc(null);
     }
@@ -291,6 +293,7 @@ const DocumentsIndex = ({ user }) => {
           ))}
         </div>
       )}
+      <ConfirmDialog open={confirmDialog.open} message="¿Estás seguro de que quieres eliminar este documento?" onConfirm={confirmDelete} onCancel={() => setConfirmDialog({ open: false, docId: null })} />
     </div>
   );
 };

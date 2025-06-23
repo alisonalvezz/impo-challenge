@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { jsPDF } from "jspdf"; 
 import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
-import { db } from '../../config/firebase';
+import { db, auth } from '../../config/firebase';
 import { doc as firestoreDoc, onSnapshot } from 'firebase/firestore';
+import { useSnackbar } from '../SnackbarContext';
+import { ArrowLeft } from 'lucide-react';
 
 const LoadingSpinner = () => (
   <div className="flex flex-col items-center justify-center h-full">
@@ -19,6 +21,8 @@ export default function CopeteGenerador({ doc, onBack }) {
   const [error, setError] = useState(null);
   const [estado, setEstado] = useState("pendiente");
   const [activeTab, setActiveTab] = useState("pdf");
+  const showSnackbar = useSnackbar();
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const isImage = doc.url && (doc.url.endsWith('.png') || doc.url.endsWith('.jpg') || doc.url.endsWith('.jpeg') || doc.url.endsWith('.gif'));
   const isPDF = doc.url && doc.url.endsWith('.pdf');
@@ -49,16 +53,14 @@ export default function CopeteGenerador({ doc, onBack }) {
     const text = generatedText;
     const save = doc.name.replace(".pdf", "_copete") + '.pdf';
 
-    const pageWidth = pdf.internal.pageSize.width; // Get page width
-    const margin = 10; // Define margin
-    const textWidth = pageWidth - margin * 2; // Calculate usable width
+    const pageWidth = pdf.internal.pageSize.width;
+    const margin = 10; 
+    const textWidth = pageWidth - margin * 2; 
 
-    // Use splitTextToSize to wrap the text
     const formattedText = pdf.splitTextToSize(text, textWidth);
 
-    // Add the formatted text to the PDF
     pdf.text(formattedText, margin, 20);
-    pdf.save(save); // Save the PDF with the name 'example.pdf'
+    pdf.save(save);
   };
 
 const exportToDocx = () => {
@@ -81,6 +83,11 @@ const exportToDocx = () => {
   });
 };
 
+  const handleCopyCopete = () => {
+    navigator.clipboard.writeText(generatedText);
+    showSnackbar('Copete copiado al portapapeles', 'success');
+  };
+
   useEffect(() => {
     const documentRef = firestoreDoc(db, "files", doc.id);
     const unsubscribe = onSnapshot(documentRef, handleDocumentUpdate, (err) => {
@@ -97,12 +104,13 @@ const exportToDocx = () => {
       {/* Botón volver arriba a la derecha, semibold y responsive */}
       <button
         onClick={onBack}
-        className="fixed top-2 right-2 sm:top-6 sm:right-8 text-impo-blue font-semibold hover:underline text-sm sm:text-base z-20 bg-white bg-opacity-80 px-2 py-1 rounded transition"
-        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}
+        className="absolute -top-5 left-0 z-20 bg-white bg-opacity-80 p-2 rounded-full shadow hover:bg-gray-100 transition"
+        title="Volver a documentos"
+        aria-label="Volver a documentos"
       >
-        &larr; Volver a documentos
+        <ArrowLeft size={28} className="text-impo-blue" />
       </button>
-      <main className="flex-grow p-2 sm:p-4 md:p-8 flex flex-col">
+      <main className="flex-grow p-2 sm:p-4 md:p-8 flex flex-col pt-2">
         <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 min-h-0">
           {/* a la izquierda el documento de origen */}
           <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden h-full min-h-0">
@@ -178,11 +186,10 @@ const exportToDocx = () => {
                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M5 10V7.914a1 1 0 0 1 .293-.707l3.914-3.914A1 1 0 0 1 9.914 3H18a1 1 0 0 1 1 1v6M5 19v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1M10 3v4a1 1 0 0 1-1 1H5m14 9.006h-.335a1.647 1.647 0 0 1-1.647-1.647v-1.706a1.647 1.647 0 0 1 1.647-1.647L19 12M5 12v5h1.375A1.626 1.626 0 0 0 8 15.375v-1.75A1.626 1.626 0 0 0 6.375 12H5Zm9 1.5v2a1.5 1.5 0 0 1-1.5 1.5v0a1.5 1.5 0 0 1-1.5-1.5v-2a1.5 1.5 0 0 1 1.5-1.5v0a1.5 1.5 0 0 1 1.5 1.5Z"/>
                   </svg>
                 </button>
-                <button onClick ={()=> navigator.clipboard.writeText(generatedText)} class="bg-green-500 hover:bg-green-700 text-black font-bold py-2 px-4 rounded">
+                <button onClick={handleCopyCopete} class="bg-green-500 hover:bg-green-700 text-black font-bold py-2 px-4 rounded">
                   <svg class="w-[28px] h-[28px] text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path stroke="currentColor" stroke-linejoin="round" stroke-width="1" d="M9 8v3a1 1 0 0 1-1 1H5m11 4h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1m4 3v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7.13a1 1 0 0 1 .24-.65L7.7 8.35A1 1 0 0 1 8.46 8H13a1 1 0 0 1 1 1Z"/>
                   </svg>
-
                 </button>
               </div>
             </div>
@@ -204,6 +211,4 @@ const exportToDocx = () => {
       </main>
     </div>
   );
-
-  
 } 
