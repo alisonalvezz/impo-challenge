@@ -139,3 +139,109 @@ def process_pdf_agent(cloud_event):
             })
         
         raise e 
+
+# --- Versión HTTP de process_pdf_agent con CORS ---
+@functions_framework.http
+def process_pdf_agent_http(request):
+    # Manejo de CORS
+    if request.method == 'OPTIONS':
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '3600'
+        }
+        return ('', 204, headers)
+
+    try:
+        data = request.get_json()
+        bucket_name = data.get("bucket")
+        file_name = data.get("name")
+        if not bucket_name or not file_name:
+            return (json.dumps({'error': 'Faltan parámetros bucket o name'}), 400, {'Access-Control-Allow-Origin': '*'})
+
+        partes = file_name.split("/")
+        user_id = partes[0] if len(partes) > 1 else "system"
+        doc_filename = partes[-1]
+        doc_id = doc_filename.replace(".pdf", "")
+
+        document_text = extract_text_from_pdf(bucket_name, file_name)
+        if not document_text:
+            raise Exception("Failed to extract text from PDF")
+
+        document_text = limpiar_texto(document_text)
+        doc_ref = firestore_client.collection('files').document(doc_id)
+        doc_ref.set({"texto_extraido": document_text}, merge=True)
+        copete = process_with_adk_web_service(document_text)
+        doc_ref.set({
+            'estado': 'generado',
+            'copete': copete,
+            'feedback_llm': {
+                'validez': 'correcto',
+                'motivo': 'Generado con RAG (Vertex AI Agent)',
+                'sugerencia': ''
+            },
+            'fechaProcesado': firestore.SERVER_TIMESTAMP
+        }, merge=True)
+        respuesta = {
+            'status': 'success',
+            'file_name': file_name,
+            'copete': copete
+        }
+        return (json.dumps(respuesta), 200, {'Access-Control-Allow-Origin': '*'})
+    except Exception as e:
+        print(f"Error processing PDF: {e}")
+        return (json.dumps({'error': str(e)}), 500, {'Access-Control-Allow-Origin': '*'})
+
+FRONTEND_ORIGIN = 'https://frontend-217609179837.us-central1.run.app'
+
+@functions_framework.http
+def feedback_copete(request):
+    # Manejo de CORS
+    if request.method == 'OPTIONS':
+        headers = {
+            'Access-Control-Allow-Origin': FRONTEND_ORIGIN,
+            'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '3600'
+        }
+        return ('', 204, headers)
+
+    data = request.get_json()
+    doc_id = data.get("doc_id")
+    feedback_usuario = data.get("feedback_usuario")
+    texto_original = data.get("texto_original")
+    copete_actual = data.get("copete")
+
+    if not doc_id or not feedback_usuario:
+        return (json.dumps({"error": "Faltan parámetros"}), 400, {'Access-Control-Allow-Origin': FRONTEND_ORIGIN})
+
+    doc_ref = firestore_client.collection('files').document(doc_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        return (json.dumps({"error": "Documento no encontrado"}), 404, {'Access-Control-Allow-Origin': FRONTEND_ORIGIN})
+
+    if not copete_actual:
+        copete_actual = doc.to_dict().get("copete", "")
+    if not copete_actual:
+        return (json.dumps({"error": "No hay copete para refinar"}), 400, {'Access-Control-Allow-Origin': FRONTEND_ORIGIN})
+
+    url = os.environ.get("ADK_FEEDBACK_URL", "https://adk-microservice-217609179837.us-central1.run.app/copete-feedback")
+    payload = {
+        "copete": copete_actual,
+        "feedback_usuario": feedback_usuario,
+        "texto_original": texto_original if texto_original is not None else ""
+    }
+    response = requests.post(url, json=payload, timeout=120)
+    if response.status_code != 200:
+        return (json.dumps({"error": "Error en microservicio", "detalle": response.text}), 500, {'Access-Control-Allow-Origin': FRONTEND_ORIGIN})
+    copete_refinado = response.json().get("copete", "")
+    if isinstance(copete_refinado, dict) and 'parts' in copete_refinado and copete_refinado['parts']:
+        copete_refinado = copete_refinado['parts'][0].get('text', '')
+
+    doc_ref.set({
+        "copete": copete_refinado,
+        "feedback_usuario": feedback_usuario
+    }, merge=True)
+
+    return (json.dumps({"copete": copete_refinado, "status": "ok"}), 200, {'Access-Control-Allow-Origin': FRONTEND_ORIGIN}) 

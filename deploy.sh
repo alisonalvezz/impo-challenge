@@ -9,31 +9,36 @@ REGION="us-central1"
 REPOSITORY="demo-app"
 FRONTEND_IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/frontend"
 BACKEND_IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/backend"
+ADK_IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/adk-microservice"
 FRONTEND_SERVICE="frontend"
 BACKEND_SERVICE="backend"
+ADK_SERVICE="adk-microservice"
 BUCKET_NAME="impo-equipo1.firebasestorage.app"
 CLOUD_FUNCTION_IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/cloud_function"
-CLOUD_FUNCTION_DIR="RAG/cloud-function"
-CLOUD_FUNCTION_NAME="process-pdf-agent-v4"
+CLOUD_FUNCTION_DIR="cloud-function"
+CLOUD_FUNCTION_NAME="process-pdf-agent"
+CLOUD_FUNCTION_FEEDBACK_NAME="feedback-copete"
 
-echo "autenticando con la cuenta de servicio"
+echo "Autenticando con la cuenta de servicio"
 gcloud auth activate-service-account --key-file="$CREDENTIALS_FILE"
 gcloud config set project "$PROJECT_ID"
 
-echo "configurando Docker para Artifact Registry"
+echo "Configurando Docker para Artifact Registry"
 gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
 
-echo "construyendo docker con arquitectura compatible :p"
+echo "Construyendo imágenes Docker (linux/amd64)"
 docker build --platform linux/amd64 -t "$FRONTEND_IMAGE" ./frontend
 docker build --platform linux/amd64 -t "$BACKEND_IMAGE" ./backend
-# docker build --platform linux/amd64 -t "$CLOUD_FUNCTION_IMAGE" ./cloud-function
+docker build --platform linux/amd64 -t "$ADK_IMAGE" ./adk-microservice
+docker build --platform linux/amd64 -t "$CLOUD_FUNCTION_IMAGE" ./cloud-function
 
-echo "pusheando imágenes a Artifact Registry"
+echo "Pusheando imágenes a Artifact Registry"
 docker push "$FRONTEND_IMAGE"
 docker push "$BACKEND_IMAGE"
-# docker push "$CLOUD_FUNCTION_IMAGE"
+docker push "$ADK_IMAGE"
+docker push "$CLOUD_FUNCTION_IMAGE"
 
-echo "dsplegando frontend"
+echo "Desplegando frontend en Cloud Run"
 gcloud run deploy "$FRONTEND_SERVICE" \
   --image "$FRONTEND_IMAGE" \
   --platform managed \
@@ -41,7 +46,7 @@ gcloud run deploy "$FRONTEND_SERVICE" \
   --allow-unauthenticated \
   --memory=1G
 
-echo "desplegando backend"
+echo "Desplegando backend en Cloud Run"
 gcloud run deploy "$BACKEND_SERVICE" \
   --image "$BACKEND_IMAGE" \
   --platform managed \
@@ -50,15 +55,15 @@ gcloud run deploy "$BACKEND_SERVICE" \
   --service-account "firebase-adminsdk-fbsvc@impo-equipo1.iam.gserviceaccount.com" \
   --memory=1G
 
-gcloud builds submit RAG/cloud-run --tag gcr.io/$PROJECT_ID/rag-cloudrun
-
-gcloud run deploy rag-cloudrun \
-  --image gcr.io/$PROJECT_ID/rag-cloudrun \
-  --region $REGION \
+echo "Desplegando adk-microservice en Cloud Run"
+gcloud run deploy "$ADK_SERVICE" \
+  --image "$ADK_IMAGE" \
+  --platform managed \
+  --region "$REGION" \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=$REGION,AGENT_ENGINE_ID=$AGENT_ENGINE_ID
+  --memory=2G
 
-echo "Desplegando Cloud Function ADK local..."
+echo "Desplegando Cloud Function de procesamiento (por evento de bucket)"
 gcloud functions deploy $CLOUD_FUNCTION_NAME \
   --gen2 \
   --runtime=python311 \
@@ -72,6 +77,18 @@ gcloud functions deploy $CLOUD_FUNCTION_NAME \
   --set-env-vars="PROJECT_ID=$PROJECT_ID" \
   --quiet
 
-echo "✅ ¡Deploy de Cloud Function ADK local completo!"
+echo "Desplegando Cloud Function feedback_copete (HTTP)"
+gcloud functions deploy $CLOUD_FUNCTION_FEEDBACK_NAME \
+  --gen2 \
+  --runtime=python311 \
+  --region=$REGION \
+  --source=$CLOUD_FUNCTION_DIR \
+  --entry-point=feedback_copete \
+  --trigger-http \
+  --memory=1GB \
+  --timeout=540s \
+  --set-env-vars="PROJECT_ID=$PROJECT_ID" \
+  --allow-unauthenticated \
+  --quiet
 
-echo "✅ ¡Deploy completo!"
+echo "✅ ¡Deploy completo de frontend, backend, adk-microservice y Cloud Functions!"

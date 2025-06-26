@@ -14,6 +14,81 @@ const LoadingSpinner = () => (
   </div>
 ); 
 
+function getPlainCopete(copete) {
+  if (!copete) return "";
+  if (typeof copete === "string") return copete;
+  if (typeof copete === "object" && copete.parts && Array.isArray(copete.parts) && copete.parts[0]?.text) {
+    return copete.parts[0].text;
+  }
+  if (typeof copete === "object") {
+    return copete.text || JSON.stringify(copete);
+  }
+  return String(copete);
+}
+
+// Agregar estilos para el modal popup
+const modalStyles = {
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modal: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '2rem',
+    minWidth: '320px',
+    maxWidth: '90vw',
+    boxShadow: '0 4px 32px rgba(0,0,0,0.15)',
+    zIndex: 1001,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  textarea: {
+    width: '100%',
+    minHeight: '80px',
+    borderRadius: '8px',
+    border: '1px solid #ccc',
+    padding: '0.5rem',
+    marginTop: '1rem',
+    marginBottom: '1rem',
+    fontSize: '1rem',
+    resize: 'vertical',
+  },
+  buttonRow: {
+    display: 'flex',
+    gap: '1rem',
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
+  cancelBtn: {
+    background: '#eee',
+    color: '#333',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '0.5rem 1.5rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  sendBtn: {
+    background: '#F58138',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '0.5rem 1.5rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+};
+
 export default function CopeteGenerador({ doc, onBack }) {
   const [generatedText, setGeneratedText] = useState("");
   const [extractedText, setExtractedText] = useState("");
@@ -23,6 +98,11 @@ export default function CopeteGenerador({ doc, onBack }) {
   const [activeTab, setActiveTab] = useState("pdf");
   const showSnackbar = useSnackbar();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showFeedbackBox, setShowFeedbackBox] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+  const [previousCopete, setPreviousCopete] = useState(null);
+  const CLOUD_FUNCTION_URL = "https://us-central1-impo-equipo1.cloudfunctions.net/feedback_copete";
 
   const isImage = doc.url && (doc.url.endsWith('.png') || doc.url.endsWith('.jpg') || doc.url.endsWith('.jpeg') || doc.url.endsWith('.gif'));
   const isPDF = doc.url && doc.url.endsWith('.pdf');
@@ -86,6 +166,46 @@ const exportToDocx = () => {
   const handleCopyCopete = () => {
     navigator.clipboard.writeText(generatedText);
     showSnackbar('Copete copiado al portapapeles', 'success');
+  };
+
+  const handleOpenFeedback = () => setShowFeedbackBox(true);
+  const handleCloseFeedback = () => {
+    setShowFeedbackBox(false);
+    setFeedback("");
+  };
+
+  const handleSendFeedback = async () => {
+    setIsSendingFeedback(true);
+    try {
+      const payload = {
+        doc_id: doc.id,
+        feedback_usuario: feedback,
+        texto_original: extractedText,
+        copete: generatedText
+      };
+      const response = await fetch(CLOUD_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Respuesta Cloud Function:', data);
+        let nuevoCopete = data.copete;
+        nuevoCopete = getPlainCopete(nuevoCopete);
+        setPreviousCopete(generatedText);
+        setGeneratedText(nuevoCopete);
+        showSnackbar('¡Feedback enviado correctamente!', 'success');
+        setShowFeedbackBox(false);
+        setFeedback("");
+      } else {
+        showSnackbar('Error al enviar feedback', 'error');
+      }
+    } catch (error) {
+      showSnackbar('Error de red al enviar feedback', 'error');
+    } finally {
+      setIsSendingFeedback(false);
+    }
   };
 
   useEffect(() => {
@@ -201,8 +321,69 @@ const exportToDocx = () => {
                   {error}
                 </div>
               ) : (
-                <div className="w-full h-full p-4 text-gray-700 bg-gray-50 rounded-md whitespace-pre-wrap overflow-auto">
-                  {generatedText || "No se pudo generar el copete"}
+                <div className="w-full h-full relative">
+                  <div className="p-4 text-gray-700 bg-gray-50 rounded-md whitespace-pre-wrap overflow-auto h-full">
+                    {getPlainCopete(generatedText) || "No se pudo generar el copete"}
+                  </div>
+                  <div style={{ position: 'absolute', bottom: 16, right: 24, display: 'flex', gap: '1rem' }}>
+                    {previousCopete && (
+                      <button
+                        onClick={() => {
+                          setGeneratedText(previousCopete);
+                          setPreviousCopete(null);
+                          showSnackbar('Volviste al copete original', 'info');
+                        }}
+                        style={{ background: '#eee', color: '#333', fontWeight: 600, padding: '0.5rem 1.5rem', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', border: 'none' }}
+                      >
+                        Volver al copete original
+                      </button>
+                    )}
+                    {!showFeedbackBox && (
+                      <button
+                        onClick={handleOpenFeedback}
+                        style={{ background: '#F58138', color: 'white', fontWeight: 600, padding: '0.5rem 1.5rem', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', border: 'none' }}
+                      >
+                        Dar feedback
+                      </button>
+                    )}
+                  </div>
+                  {showFeedbackBox && (
+                    <div style={modalStyles.overlay}>
+                      <div style={modalStyles.modal}>
+                        <div style={{fontWeight: 600, fontSize: '1.2rem', marginBottom: '0.5rem'}}>Escribe aquí tu feedback</div>
+                        <textarea
+                          style={modalStyles.textarea}
+                          value={feedback}
+                          onChange={e => setFeedback(e.target.value)}
+                          placeholder="Escribe tu feedback aquí..."
+                          rows={4}
+                          disabled={isSendingFeedback}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              if (feedback.trim() && !isSendingFeedback) handleSendFeedback();
+                            }
+                          }}
+                        />
+                        <div style={modalStyles.buttonRow}>
+                          <button
+                            style={modalStyles.cancelBtn}
+                            onClick={handleCloseFeedback}
+                            disabled={isSendingFeedback}
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            style={modalStyles.sendBtn}
+                            onClick={handleSendFeedback}
+                            disabled={isSendingFeedback || !feedback.trim()}
+                          >
+                            {isSendingFeedback ? 'Enviando...' : 'Enviar'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

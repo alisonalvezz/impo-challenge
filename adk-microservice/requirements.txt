@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 pydantic
-google-adk
+git+https://github.com/google/adk-python.git@main
 google-genai
 google-cloud-aiplatform
 python-dotenv
