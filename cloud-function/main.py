@@ -15,6 +15,8 @@ from datetime import datetime
 import pytz
 import sys
 import subprocess
+import unicodedata
+import re
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'RAG'))
 
@@ -48,32 +50,26 @@ def extract_text_from_pdf(bucket_name, file_name):
         print(f"Error extracting text from PDF: {e}")
         return None
 
-def process_with_adk_directly(document_text, user_id="pdf-processor"):
-    """Process document text using ADK directamente (patrón moderno con sesión y mensaje)."""
+def limpiar_texto(texto):
+    texto = unicodedata.normalize('NFC', texto)
+    texto = ''.join(c for c in texto if c.isprintable())
+    texto = re.sub(r'\s+', ' ', texto)
+    texto = texto.strip()
+    return texto
+
+def process_with_adk_web_service(document_text, user_id="pdf-processor"):
     try:
-        import asyncio
-        from google.adk.runners import InMemoryRunner
-        from google.genai.types import Part, UserContent
-        from rag.agent import root_agent
-        
-        print("Inicializando ADK agent directamente...")
-        prompt = f"Genera un copete para el siguiente documento legal:\n\n{document_text}"
-        runner = InMemoryRunner(app_name="copete-generator", agent=root_agent)
-        session = asyncio.run(runner.session_service.create_session(app_name=runner.app_name, user_id=user_id))
-        content = UserContent(parts=[Part(text=prompt)])
-        result = None
-        for event in runner.run(user_id=session.user_id, session_id=session.id, new_message=content):
-            if hasattr(event, 'content') and hasattr(event.content, 'parts'):
-                for part in event.content.parts:
-                    if hasattr(part, 'text') and part.text:
-                        result = part.text
-                        break
-            if result:
-                break
-        print(f"ADK agent result: {result}")
-        return result if result else "No se pudo extraer el copete del documento."
+        url = "https://adk-microservice-217609179837.us-central1.run.app/copete"
+        response = requests.post(url, json={"texto": document_text}, timeout=120)
+        if response.status_code == 200:
+            copete = response.json().get("copete", "No se pudo extraer el copete del documento.")
+            print(f"Copete recibido del microservicio: {copete}")
+            return copete
+        else:
+            print(f"Error en microservicio: {response.text}")
+            return f"Error al procesar el documento: {response.text}"
     except Exception as e:
-        print(f"Error processing with ADK directly: {e}")
+        print(f"Error llamando al microservicio: {e}")
         return f"Error al procesar el documento: {str(e)}"
 
 @functions_framework.cloud_event
@@ -99,13 +95,14 @@ def process_pdf_agent(cloud_event):
         document_text = extract_text_from_pdf(bucket_name, file_name)
         if not document_text:
             raise Exception("Failed to extract text from PDF")
-        
-        print(f"Extracted {len(document_text)} characters from PDF")
+
+        document_text = limpiar_texto(document_text)
+        print(f"Extracted {len(document_text)} characters from PDF (limpio)")
         
         doc_ref = firestore_client.collection('files').document(doc_id)
         doc_ref.set({"texto_extraido": document_text}, merge=True)
         
-        copete = process_with_adk_directly(document_text)
+        copete = process_with_adk_web_service(document_text)
         
         print(f"Extracted copete: {copete}")
         

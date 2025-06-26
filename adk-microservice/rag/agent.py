@@ -68,11 +68,11 @@ generator_agent = Agent(
     instruction="""
 Eres un abogado, tu tarea es generar un resumen breve, también llamado copete, que describa con claridad y precisión el contenido principal del documento legal, mencionando también la promulgación y adaptándose a ella.
 Utiliza lenguaje de abogado, debe de ser apegado al contexto de la ley.
-Cuidar el largo del copete, observando los ejemplos.
+Cuidar el largo del copete, observando los ejemplos. Tienen que ser de 1 oracion.
 
 [IMPORTANTE]
 El número de ley puede estar escrito con espacios, guiones, puntos, letras separadas, símbolos o en formatos no estándar (ej: L E Y 2 0 - 3 9 8, LEY: 20.398, lEYr 2 0-3 8 7, etc). Siempre debes identificar el número real de la ley y escribirlo al principio del copete en el formato: Ley XXXXX.
-Si el número de ley no es claro, intenta deducirlo a partir de los caracteres y patrones presentes. Regulariza y reconstruye el número aunque esté fragmentado o con símbolos.
+Si el número de ley no es claro, intenta deducirlo a partir de los caracteres y patrones presentes, o del nombre del archivo. Regulariza y reconstruye el número aunque esté fragmentado o con símbolos.
 
 [Output]
 Siempre poner la Ley y su número correspondiente al principio, en formato: Ley XXXXX.
@@ -84,6 +84,8 @@ El texto debe de estar en formato de texto plano, evita usar markup.
 8.- Ley 20.385.- Autorízase la salida de aguas jurisdiccionales del Buque ROU 23 "MALDONADO" y de su Plana Mayor y Tripulación, compuesta por 47 (cuarenta y siete) efectivos, a los efectos de participar de los eventos con motivo de la conmemoración del "Día do Marinheiro", que se desarrollará en la ciudad de Río Grande, República Federativa de Brasil, en el período comprendido entre el 11 y el 15 de diciembre de 2024.
 
 [Ejemplos de Leyes con strings complejos]
+Texto original: L E Y l f  2 O  -38 2
+Copete: Ley 20.382
 Texto original: L E Y 2 0 - 3 9 8
 Copete: Ley 20.398 ...
 Texto original: lEYr 2 0-3 8 7
@@ -137,7 +139,7 @@ Eres un abogado revisando el copete que otro abogado compañero tuyo realizó. T
 
 Revisar que el copete esté bien estructurado y que se cumplan las siguientes normas:
 1) Que el copete contenga al principio la Ley de la cual se está documentando, en formato: Ley XXXXX. El número de ley debe estar correctamente identificado y normalizado, aunque en el texto original esté fragmentado, con símbolos, espacios, guiones, puntos, letras separadas o en formato no estándar.
-2) Cuidar el largo del copete, observando los ejemplos.
+2) Cuidar el largo del copete, observando los ejemplos. No tiene que ser de mas de 1 oracion.
 3) Utiliza lenguaje de abogado, debe de ser apegado al contexto de la ley.
 4) Además de dar lectura y cognoscibilidad al texto que luce en la promulgación del Presidente, se chequea en forma integral el texto de toda la ley, para luego redactar el copete de la norma.
 5) Se adecúa: el modo del verbo a consignarse, inclusión en imperativo, aquellos vocablos que normalmente vienen consignados en mayúsculas, o abreviados, se regularizan a los formatos del Diario en forma completa o in-extensa; así como también se enfatiza el uso correcto de los signos de puntuación y utilización de preposiciones.
@@ -165,12 +167,22 @@ Aquí tendrás un conjunto medianamente extenso de ejemplos para los cuales podr
     output_key=STATE_CRITICISM
 )
 
+def refiner_output_handler(state, output):
+    # Log para depuración
+    print(f"[LOG] Handler Refiner: output recibido = {output}")
+    criticism = state.get('criticism', '').strip()
+    print(f"[LOG] Handler Refiner: criticism recibido = '{criticism}'")
+    if criticism == "No major issues found.":
+        print("[LOG] Handler Refiner: Se detectó señal de salida, llamando a exit_loop.")
+        state['exit_loop'] = True  # Marca para el loop
+    state['current_document'] = output
+    state['final_copete'] = output  # Asegura que siempre esté presente
+    return state
 
 # STEP 2b: Refiner/Exiter Agent (Inside the Refinement Loop)
 refiner_agent_in_loop = Agent(
     name="RefinerAgent",
     model=GEMINI_MODEL,
-    # Relies solely on state via placeholders
     include_contents='none',
     instruction="""
         Eres un abogado, tu tarea es generar un resumen breve, también llamado copete, que describa con claridad y precisión el contenido principal del documento legal, mencionando también la promulgación y adaptándose a ella. 
@@ -178,8 +190,8 @@ refiner_agent_in_loop = Agent(
         Utiliza lenguaje de abogado, debe de ser apegado al contexto de la ley. 
 
         a) Además de dar lectura y cognoscibilidad al texto que luce en la promulgación del Presidente, se chequea en forma integral el texto de toda la ley, para luego redactar el copete de la norma.
-	 	b) Se adecúa: el modo del verbo a consignarse, inclusión en imperativo, aquellos vocablos que normalmente vienen consignados en mayúsculas, o abreviados, se regularizan a los formatos del Diario en forma completa o in-extensa; así como también se enfatiza el uso correcto de los signos de puntuación y utilización de preposiciones.
-		c) En todos los casos se aplica corrector ortográfico para evitar errores.
+        b) Se adecúa: el modo del verbo a consignarse, inclusión en imperativo, aquellos vocablos que normalmente vienen consignados en mayúsculas, o abreviados, se regularizan a los formatos del Diario en forma completa o in-extensa; así como también se enfatiza el uso correcto de los signos de puntuación y utilización de preposiciones.
+        c) En todos los casos se aplica corrector ortográfico para evitar errores.
         d) Si el copete no contiene la ley, se debe de agregar al principio del copete la ley correspondiente.
 
         [Input]
@@ -192,10 +204,9 @@ refiner_agent_in_loop = Agent(
         
         """,
     description="Refines the document based on critique, or calls exit_loop if critique indicates completion.",
-    tools=[exit_loop], # Provide the exit_loop tool
-    output_key=STATE_CURRENT_DOC # Overwrites state['current_document'] with the refined version
+    tools=[exit_loop],
+    output_key=STATE_CURRENT_DOC
 )
-
 
 # STEP 2: Refinement Loop Agent
 refinement_loop = LoopAgent(
@@ -208,11 +219,27 @@ refinement_loop = LoopAgent(
     max_iterations=10 # Limit loops
 )
 
+finalizer_agent = Agent(
+    name="FinalizerAgent",
+    model=GEMINI_MODEL,
+    instruction="""
+Eres un abogado editor final. Recibes un copete legal ya revisado.
+Tu tarea es:
+- Asegurarte de que el copete comience con 'Ley XXXXX' (agrega el número de ley si falta).
+- Corregir cualquier detalle de formato, puntuación u ortografía.
+- Devolver solo el copete final, en texto plano, sin explicaciones ni markup.
+[Copete recibido]
+{{current_document}}
+""",
+    output_key="final_copete"
+)
+
 root_agent = SequentialAgent(
     name="CopetePipeline",
     sub_agents=[
-        generator_agent, # Run first to create initial doc
-        refinement_loop       # Then run the critique/refine loop
+        generator_agent,
+        refinement_loop,
+        finalizer_agent
     ],
-    description="Writes an initial document and then iteratively refines it with critique using an exit tool."
+    description="Genera, refina y finaliza el copete legal."
 )
