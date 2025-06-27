@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+git+https://github.com/google/adk-python.git@main
+google-genai
+google-cloud-aiplatform
+python-dotenv
+llama-index 
